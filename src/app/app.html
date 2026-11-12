@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prune: bookmark cleaner</title>
+  <link rel="icon" href="../icons/icon.svg">
+  <link rel="stylesheet" href="../popup/popup.css">
+  <link rel="stylesheet" href="../shared/support.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <span class="brand"><img src="../icons/icon.svg" alt="" width="28" height="28"> Prune</span>
+      <span id="libStats" class="muted lib-stats"></span>
+      <a class="support-pill" data-support title="Prune is free forever, with no ads and no tracking. Tips keep it maintained."><span class="heart">&#x2665;</span> Support Prune</a>
+    </header>
+
+    <div id="supportCard" hidden></div>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" data-tab="dead">Dead links <span class="count" id="count-dead"></span></button>
+      <button type="button" role="tab" data-tab="redirects">Redirects <span class="count" id="count-redirects"></span></button>
+      <button type="button" role="tab" data-tab="dupes">Duplicates <span class="count" id="count-dupes"></span></button>
+      <button type="button" role="tab" data-tab="empty">Empty folders <span class="count" id="count-empty"></span></button>
+      <button type="button" role="tab" data-tab="removed">Removed <span class="count" id="count-removed"></span></button>
+      <button type="button" role="tab" data-tab="settings">Settings</button>
+    </nav>
+
+    <section class="panel" id="panel-dead" role="tabpanel" hidden>
+      <div class="scanbox" id="scanBox"></div>
+      <div class="toolbar" id="toolbar-dead"></div>
+      <div class="list" id="list-dead"></div>
+    </section>
+
+    <section class="panel" id="panel-redirects" role="tabpanel" hidden>
+      <div class="intro" id="intro-redirects"></div>
+      <div class="toolbar" id="toolbar-redirects"></div>
+      <div class="list" id="list-redirects"></div>
+    </section>
+
+    <section class="panel" id="panel-dupes" role="tabpanel" hidden>
+      <div class="intro" id="intro-dupes"></div>
+      <div class="toolbar" id="toolbar-dupes"></div>
+      <div class="list" id="list-dupes"></div>
+    </section>
+
+    <section class="panel" id="panel-empty" role="tabpanel" hidden>
+      <div class="intro" id="intro-empty"></div>
+      <div class="toolbar" id="toolbar-empty"></div>
+      <div class="list" id="list-empty"></div>
+    </section>
+
+    <section class="panel" id="panel-removed" role="tabpanel" hidden>
+      <div class="intro" id="intro-removed"></div>
+      <div class="list" id="list-removed"></div>
+      <h3 class="section-title">Recent changes</h3>
+      <div class="list" id="list-history"></div>
+    </section>
+
+    <section class="panel" id="panel-settings" role="tabpanel" hidden>
+      <div class="card">
+        <h2>Link check</h2>
+        <label class="row"><span>Wait for each site up to (seconds)</span><input id="timeout" type="number" min="3" max="60" step="1"></label>
+        <label class="row"><span>Links checked at the same time<small>Prune never checks more than 2 links on the same site at once.</small></span><input id="concurrency" type="number" min="1" max="32" step="1"></label>
+        <label class="row"><span>Check links that timed out or failed once more at the end</span><input id="retry" type="checkbox"></label>
+        <label class="row col"><span>Never contact these sites<small>One per line, e.g. intranet.example.com. Their bookmarks are left out of link checks.</small></span>
+          <textarea id="skipHosts" rows="3" spellcheck="false" placeholder="example.com"></textarea></label>
+        <div class="row"><span>Website access<small id="accessNote"></small></span><button id="revokeAccess" type="button" class="btn">Remove access</button></div>
+        <div class="row"><span>Saved link check results<small id="resultsNote"></small></span><button id="forgetResults" type="button" class="btn">Forget results</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Duplicates</h2>
+        <p class="muted">Two bookmarks count as duplicates when their addresses match after these rules.</p>
+        <label class="row"><span>Treat http:// and https:// as the same</span><input id="dupScheme" type="checkbox"></label>
+        <label class="row"><span>Ignore www.</span><input id="dupWww" type="checkbox"></label>
+        <label class="row"><span>Ignore a trailing slash (/page and /page/)</span><input id="dupSlash" type="checkbox"></label>
+        <label class="row"><span>Ignore tracking parameters<small>utm_source, fbclid, gclid, mc_cid and similar</small></span><input id="dupTracking" type="checkbox"></label>
+        <label class="row"><span>Ignore #anchors<small>Off by default: many sites use them for different pages (#/inbox, #/settings).</small></span><input id="dupHash" type="checkbox"></label>
+      </div>
+
+      <div class="card support">
+        <h2>Support</h2>
+        <p>Prune is free and every feature is unlocked for everyone. There are no ads, no accounts and no tracking: your bookmarks and settings never leave this browser, and link checks go straight from Firefox to each bookmarked site. If Prune saved you some tidying, a tip on Ko-fi helps keep it maintained.</p>
+        <a class="support-pill" data-support><span class="heart">&#x2665;</span> Buy me a coffee on Ko-fi</a>
+      </div>
+    </section>
+
+    <div class="actionbar" id="actionBar" hidden>
+      <span id="selInfo"></span>
+      <span class="spacer"></span>
+      <button id="actSecondary" type="button" class="btn" hidden></button>
+      <button id="actPrimary" type="button" class="btn primary"></button>
+    </div>
+  </div>
+
+  <dialog id="confirm" class="dialog">
+    <h3 id="confirmTitle"></h3>
+    <p id="confirmBody"></p>
+    <div class="dialog-buttons">
+      <button id="confirmCancel" type="button" class="btn">Cancel</button>
+      <button id="confirmOk" type="button" class="btn primary"></button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden><span id="toastText"></span><button id="toastUndo" type="button" class="toast-btn" hidden>Undo</button></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

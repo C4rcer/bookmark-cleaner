@@ -1,0 +1,23 @@
+{
+  "slug": "prune-bookmark-cleaner",
+  "name": "Prune: Dead Link & Duplicate Bookmark Cleaner",
+  "summary": "Find dead links, duplicate bookmarks and empty folders, review everything in one list, and clean up with undo. Nothing is deleted until you say so. Free, no ads, no tracking.",
+  "description": "Prune tidies up years of bookmarks: links that no longer work, pages you saved three times, folders with nothing in them. You see everything in one review list first, and nothing changes until you confirm.\n\n**What it finds**\n- Dead links: pages that are gone (404 / 410), sites that no longer exist, links that time out or return server errors\n- Links that now just send you to a site's home page (usually a removed page)\n- Redirects: bookmarks whose page moved, with one click to update them to the new address (title and folder stay the same)\n- Duplicates, even when the addresses differ slightly: http vs https, www, a trailing slash, or tracking junk like utm_source and fbclid\n- Empty folders, including folders that only hold other empty folders\n\n**Safe by design**\n- Review list with checkboxes, filters and counts. Only clear-cut cases are ticked for you\n- \"Remove\" moves bookmarks into a \"Removed by Prune\" folder instead of deleting them. Undo any change, or put items back one by one\n- Emptying that folder is a separate, explicit step\n- Link checks are made without your cookies, so they can't sign you out of sites or act on your accounts\n- Polite checking: a time limit per site, a few links at a time and never more than two on the same site\n- Pages that need a sign-in or block automated checks are shown separately, never ticked as dead\n\n**Free, for real**\nEvery feature is unlocked for everyone. No ads, no account, no analytics. Your bookmarks, settings and results stay in your browser; link checks go straight from Firefox to each bookmarked site and nowhere else.\n\nIf Prune saved you some tidying and you'd like to say thanks, there's a Ko-fi link in the popup. It's entirely optional and unlocks nothing.\n\n**Permissions**\n- \"Read and modify bookmarks\": to find problems and move, update or restore the bookmarks you choose.\n- \"Access your data for all websites\" is optional and only requested when you start a dead-link check, because Prune has to contact each bookmarked site to see if it still answers. You can remove it again in Settings at any time.\n\nDesktop Firefox only: Firefox for Android doesn't give add-ons access to bookmarks.",
+  "categories": {
+    "firefox": [
+      "bookmarks"
+    ]
+  },
+  "compatibility": [
+    "firefox"
+  ],
+  "license": "MPL-2.0",
+  "homepage": "",
+  "support_url": "",
+  "contributions_url": "https://ko-fi.com/carcer7378",
+  "screenshot_captions": {
+    "1-dead-links.png": "Find dead links and review them before anything changes",
+    "2-duplicates.png": "Spot duplicates even when the addresses differ slightly",
+    "3-removed-undo.png": "Removed bookmarks go to a folder you can undo from, never straight to the bin"
+  }
+}

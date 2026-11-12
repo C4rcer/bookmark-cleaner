@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prune</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="../shared/support.css">
+</head>
+<body>
+  <header>
+    <span class="brand"><img src="../icons/icon.svg" alt="" width="18" height="18"> Prune</span>
+    <a class="support-pill" data-support title="Prune is free forever, with no ads and no tracking. Tips keep it maintained."><span class="heart">&#x2665;</span> Support</a>
+  </header>
+  <main>
+    <p class="lib" id="lib">Counting bookmarks</p>
+    <div class="tiles">
+      <button type="button" class="tile" data-tab="dead"><span class="num" id="nDead"></span><span class="lbl">Dead links</span></button>
+      <button type="button" class="tile" data-tab="dupes"><span class="num" id="nDupes"></span><span class="lbl">Duplicate copies</span></button>
+      <button type="button" class="tile" data-tab="empty"><span class="num" id="nEmpty"></span><span class="lbl">Empty folders</span></button>
+      <button type="button" class="tile" data-tab="redirects"><span class="num" id="nRedirects"></span><span class="lbl">Moved (redirects)</span></button>
+    </div>
+    <button type="button" id="btnOpen" class="primary-wide">Open Prune</button>
+    <div id="supportCard" hidden></div>
+  </main>
+  <footer>
+    <p class="muted small" id="foot"></p>
+  </footer>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
