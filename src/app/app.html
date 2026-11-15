@@ -7,6 +7,7 @@
   <link rel="icon" href="../icons/icon.svg">
   <link rel="stylesheet" href="../popup/popup.css">
   <link rel="stylesheet" href="../shared/support.css">
+  <link rel="stylesheet" href="../shared/more-addons.css">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -83,8 +84,18 @@
 
       <div class="card support">
         <h2>Support</h2>
-        <p>Prune is free and every feature is unlocked for everyone. There are no ads, no accounts and no tracking: your bookmarks and settings never leave this browser, and link checks go straight from Firefox to each bookmarked site. If Prune saved you some tidying, a tip on Ko-fi helps keep it maintained.</p>
-        <a class="support-pill" data-support><span class="heart">&#x2665;</span> Buy me a coffee on Ko-fi</a>
+        <p>Prune is free and every feature is unlocked for everyone. There are no ads, no accounts and no tracking: your bookmarks and settings never leave this browser, and link checks go straight from Firefox to each bookmarked site. If Prune saved you some tidying, a tip on Ko-fi helps keep it maintained. A rating on Firefox Add-ons also helps other people find it.</p>
+        <div class="support-actions">
+          <a class="support-pill" data-support><span class="heart">&#x2665;</span> Buy me a coffee on Ko-fi</a>
+          <a class="rate-pill" data-rate><span class="star" aria-hidden="true">&#x2605;</span> Rate Prune on Firefox Add-ons</a>
+        </div>
+      </div>
+
+      <div class="card" id="moreAddons">
+        <h2>More free add-ons</h2>
+        <p class="muted">By the same developer, on the same terms: free, no ads, no tracking.</p>
+        <ul class="more-list" data-more-list></ul>
+        <a class="more-all" data-more-all>See them all on Firefox Add-ons</a>
       </div>
     </section>
 

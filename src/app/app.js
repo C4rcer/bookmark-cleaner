@@ -1,4 +1,5 @@
 import { wireSupportLinks, maybeShowMilestone } from "../shared/support.js";
+import { renderMoreAddons } from "../shared/more-addons.js";
 import { clampInt, getSettings, parseHosts, saveSettings } from "../shared/settings.js";
 import {
   REMOVED_TITLE, emptyRemoved, findDuplicates, findEmptyFolders, formatPath, getHistory, moveToRemoved,
@@ -942,6 +943,7 @@ function setTabFromHash() {
 
 async function init() {
   wireSupportLinks();
+  renderMoreAddons(document.getElementById("moreAddons")).catch(() => {});
   buildToolbars();
   bindSettings();
   for (const b of document.querySelectorAll(".tabs button")) {

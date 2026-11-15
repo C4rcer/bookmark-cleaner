@@ -79,6 +79,7 @@ src/                       everything that ships
                            move to Removed / update URLs / undo / empty
   shared/settings.js       defaults + storage helpers
   shared/support.*         Ko-fi pill + one-time milestone card (from the template)
+  shared/more-addons.*     "More free add-ons" card + rate link (same file in every add-on; set `live: true` as listings are approved)
 store-assets/listing.json  AMO listing text, category, Ko-fi contributions_url
 store-assets/screenshots/  1280x800 listing images (made by tests/screenshots.py)
 tests/                     real-Firefox E2E, local test server, screenshot generator
