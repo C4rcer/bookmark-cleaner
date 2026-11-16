@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Prune: Dead Link & Duplicate Bookmark Cleaner",
   "short_name": "Prune",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Find dead links, duplicate bookmarks and empty folders, review them, and clean up with one-click undo. Free, no ads, no tracking.",
   "browser_specific_settings": {
     "gecko": {
