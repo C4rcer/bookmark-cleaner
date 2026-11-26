@@ -64,7 +64,7 @@ async function init() {
 
   const cleaned = (got.stats && got.stats.cleaned) || 0;
   await maybeShowMilestone($("supportCard"), cleaned, [100, 1000, 5000], (m) =>
-    `Prune has tidied up ${fmt(m)} bookmarks for you so far. It's free, with no ads and no tracking. If that was worth a coffee, tips keep it maintained.`);
+    `Prune has tidied up ${fmt(m)} bookmarks for you so far.`);
 }
 
 init();

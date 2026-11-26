@@ -43,6 +43,7 @@ manifest has no `gecko_android` block.
 | Result | Shown as | Ticked by default |
 | --- | --- | --- |
 | 404, 410 | Not found | yes |
+| 404 on a site that hides private pages (repository pages on GitHub and Codeberg) | May be private | no |
 | DNS failure, connection refused | Site unreachable | yes |
 | 2xx after redirecting to a home page | Sends you to a home page | no |
 | no answer within the time limit | Timed out | no |
@@ -78,7 +79,7 @@ src/                       everything that ships
   shared/bookmarks.js      tree snapshot, URL normalisation, duplicates, empty folders,
                            move to Removed / update URLs / undo / empty
   shared/settings.js       defaults + storage helpers
-  shared/support.*         Ko-fi pill + one-time milestone card (from the template)
+  shared/support.*         Ko-fi pill + one-time milestone card: a rating ask first, tips later (from the template)
   shared/more-addons.*     "More free add-ons" card + rate link (same file in every add-on; set `live: true` as listings are approved)
 store-assets/listing.json  AMO listing text, category, Ko-fi contributions_url
 store-assets/screenshots/  1280x800 listing images (made by tests/screenshots.py)
@@ -95,7 +96,7 @@ Storage keys (`browser.storage.local`): `settings`, `linkResults` (url -> result
 ```powershell
 python tools/release.py lint                 # build + web-ext lint the zip (expect 0/0/0)
 python -m pip install selenium pillow        # once, ideally in a venv, for the tests
-python tests/e2e_firefox.py                  # 91 checks in headless Firefox, ~1 min
+python tests/e2e_firefox.py                  # 106 checks in headless Firefox, ~1 min
 python tests/screenshots.py                  # regenerate store screenshots
 ```
 

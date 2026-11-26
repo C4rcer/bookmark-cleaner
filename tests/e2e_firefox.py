@@ -32,7 +32,8 @@ ADDON_ID = "prune-bookmark-cleaner@c4rcer"
 UUID = "5e1c3b7a-0d2f-4c4e-9b8a-11f0a7c1ea4e"
 PORT = 8941
 CLOSED_PORT = 8949  # nothing listens here (the "Router" bookmark)
-HOSTS = ["site.prune.test", "www.site.prune.test", "other.prune.test"]
+HOSTS = ["site.prune.test", "www.site.prune.test", "other.prune.test", "github.com"]
+G = f"http://github.com:{PORT}"  # served by tests/server.py, which answers 404 here like GitHub does when signed out
 S = f"http://site.prune.test:{PORT}"
 O = f"http://other.prune.test:{PORT}"
 EXT = f"moz-extension://{UUID}"
@@ -51,6 +52,7 @@ LINKS = [
     ("Old", f"{S}/old"),
     ("Old article", f"{O}/old-article"),
     ("Private", f"{S}/private"),
+    ("Private repo", f"{G}/acme/secret-plans"),
     ("Docs", f"{O}/docs"),
     ("Closed", "http://vanished-site.invalid/"),  # .invalid never resolves
     ("Router", f"http://127.0.0.1:{CLOSED_PORT}/admin"),
@@ -112,6 +114,90 @@ def wait(fn, timeout=10.0, step=0.1):
     return last
 
 
+def check_milestone_card(api):
+    """The shared thank-you card, driven directly on the extension page that is open now:
+    the first card a user ever gets asks for a rating, later ones for a tip. Leaves storage as it found it."""
+    out = api("""
+      const m = await import('/shared/support.js');
+      const lists = await import('/shared/more-addons.js');
+      const self = lists.ADDONS.find((a) => a.id === browser.runtime.id);
+      const KEY = 'supportNudge';
+      const saved = (await browser.storage.local.get(KEY))[KEY];
+      const box = document.createElement('div');
+      document.body.append(box);
+      box.addEventListener('click', (e) => e.preventDefault(), true);  // a test click must not open AMO or Ko-fi
+      const fact = (n) => `Fact ${n}.`;
+      const stored = async () => (await browser.storage.local.get(KEY))[KEY];
+      const settle = async (pred) => {
+        for (let i = 0; i < 60; i++) {
+          const s = await stored();
+          if (s && pred(s)) return s;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return (await stored()) || null;
+      };
+      const snap = () => {
+        const rate = box.querySelector('a[data-rate-ask]');
+        const tip = box.querySelector('a[data-support]');
+        return {
+          text: box.querySelector('p') ? box.querySelector('p').textContent : '',
+          rate: rate ? rate.href : null, rateLabel: rate ? rate.textContent.trim() : null,
+          rateNewTab: rate ? rate.target === '_blank' && rate.rel === 'noopener' : null,
+          tip: tip ? tip.href : null,
+          buttons: [...box.querySelectorAll('button')].map((b) => b.textContent),
+        };
+      };
+      const out = { slug: self ? self.slug : null, name: self ? self.name : null };
+      try {
+        await browser.storage.local.remove(KEY);
+        out.early = await m.maybeShowMilestone(box, 4, [5, 50], fact);
+        out.shown1 = await m.maybeShowMilestone(box, 5, [5, 50], fact);
+        out.first = snap();
+        box.querySelectorAll('button')[0].click();  // Not now
+        out.after1 = await settle((s) => (s.seen || []).includes(5));
+        out.hidden1 = box.hidden;
+        out.again = await m.maybeShowMilestone(box, 5, [5, 50], fact);
+        out.shown2 = await m.maybeShowMilestone(box, 50, [5, 50], fact);
+        out.second = snap();
+        box.querySelectorAll('button')[1].click();  // Don't ask again
+        out.after2 = await settle((s) => s.optOut === true);
+        out.afterOptOut = await m.maybeShowMilestone(box, 500, [5, 50, 500], fact);
+        // Someone who saw a tip card under an older version: no rating ask recorded yet.
+        await browser.storage.local.set({ [KEY]: { seen: [5], optOut: false } });
+        out.shown3 = await m.maybeShowMilestone(box, 50, [5, 50], fact);
+        out.third = snap();
+        const link = box.querySelector('a[data-rate-ask]');
+        if (link) link.click();
+        out.after3 = await settle((s) => s.rateAsked === true && (s.seen || []).includes(50));
+      } finally {
+        if (saved === undefined) await browser.storage.local.remove(KEY);
+        else await browser.storage.local.set({ [KEY]: saved });
+        box.remove();
+      }
+      return out;
+    """)
+    out = out if isinstance(out, dict) else {"error": out}
+    amo = "https://addons.mozilla.org/firefox/addon/%s/" % out.get("slug")
+    first, second, third = (out.get(k) or {} for k in ("first", "second", "third"))
+    check("thank-you card: nothing before the first milestone", out.get("early") is False, out.get("error") or out.get("early"))
+    check("thank-you card: the first one a user ever gets asks for a rating, not a tip",
+          out.get("shown1") is True and bool(out.get("slug")) and first.get("rate") == amo and first.get("rateNewTab") is True
+          and first.get("tip") is None and first.get("rateLabel") == "\u2605 Rate %s" % out.get("name")
+          and first.get("text") == "Fact 5. It's free, with no ads and no tracking. If it's useful to you, a rating on Firefox Add-ons helps other people find it."
+          and first.get("buttons") == ["Not now", "Don't ask again"], first)
+    check("thank-you card: 'Not now' closes it and that milestone never comes back",
+          out.get("hidden1") is True and 5 in ((out.get("after1") or {}).get("seen") or [])
+          and (out.get("after1") or {}).get("rateAsked") is True and out.get("again") is False, (out.get("after1"), out.get("again")))
+    check("thank-you card: the next milestone asks for a tip on Ko-fi",
+          out.get("shown2") is True and second.get("tip") == "https://ko-fi.com/carcer7378" and second.get("rate") is None
+          and second.get("text") == "Fact 50. It's free, with no ads and no tracking. If that's worth a coffee, tips keep it maintained.", second)
+    check("thank-you card: 'Don't ask again' is final",
+          (out.get("after2") or {}).get("optOut") is True and out.get("afterOptOut") is False, (out.get("after2"), out.get("afterOptOut")))
+    check("thank-you card: someone who saw a tip card under an older version is asked to rate once",
+          out.get("shown3") is True and third.get("rate") == amo and third.get("tip") is None
+          and (out.get("after3") or {}).get("rateAsked") is True and 50 in ((out.get("after3") or {}).get("seen") or []), (third, out.get("after3")))
+
+
 def main():
     zips = sorted((ROOT / "dist").glob("*.zip"), key=lambda p: p.stat().st_mtime)
     if not zips:
@@ -127,6 +213,10 @@ def main():
     # Grant optional permissions without the doorhanger (headless can't click it).
     opts.set_preference("extensions.webextOptionalPermissionPrompts", False)
     opts.set_preference("network.dns.localDomains", ",".join(HOSTS))
+    # github.com is on Firefox's HTTPS-only preload list; the stand-in is plain http.
+    opts.set_preference("network.stricttransportsecurity.preloadlist", False)
+    opts.set_preference("dom.security.https_first", False)
+    opts.set_preference("dom.security.https_first_schemeless", False)
     opts.set_preference("media.volume_scale", "0.0")
     driver = webdriver.Firefox(options=opts)
     driver.set_window_size(1280, 1000)
@@ -256,6 +346,7 @@ def main():
             "OK page": "ok", "Missing": "notfound", "Gone": "notfound", "Server error": "server",
             "Forbidden": "blocked", "Slow": "timeout", "No HEAD": "ok", "HEAD fails": "ok", "Old": "redirect",
             "Old article": "home", "Private": "redirect", "Docs": "redirect", "Closed": "unreachable", "Router": "local",
+            "Private repo": "private",
         }
         for title, want in expect.items():
             check(f"classified {title} as {want}", cat(title) == want, res.get(dict(LINKS)[title]))
@@ -280,12 +371,46 @@ def main():
         check("link checks send no cookies", all(not c for c in scan_reqs), [c for c in scan_reqs if c][:3])
 
         # ---- review list: counts, filters, search
-        check("dead-link count badge", text("#count-dead") == "8", text("#count-dead"))
+        check("dead-link count badge", text("#count-dead") == "9", text("#count-dead"))
         pre = checked_ids("list-dead")
         check("only clear-cut dead links pre-ticked", pre == {ids["Missing"], ids["Gone"], ids["Closed"]},
               sorted(pre))
+        # A private repository answers 404 to anyone signed out: listed, explained, never ticked.
+        row = js(f"""const r = document.querySelector('#list-dead .row-item[data-id="{ids['Private repo']}"]');
+                     return r ? {{badge: r.querySelector('.badge').textContent, hint: (r.querySelector('.meta') || {{}}).textContent || '',
+                                 ticked: r.querySelector('input').checked}} : null;""")
+        check("a 404 that may only mean 'signed out' is listed as 'May be private', not ticked",
+              bool(row) and row["badge"].startswith("May be private") and row["ticked"] is False and ids["Private repo"] not in pre, row)
+        check("...and the row says why", bool(row) and "signed out" in row["hint"] and "Open the link" in row["hint"], row)
+        rules = ext_call("""
+          const m = await import('/app/checker.js');
+          const c = (u, status = 404) => m.classify(u, {status}).cat;
+          const old = m.refreshCats({
+            'https://github.com/acme/secret': {cat: 'notfound', code: 404},
+            'https://github.com/acme/gone': {cat: 'notfound', code: 410},
+            'https://example.com/a/b': {cat: 'notfound', code: 404},
+          });
+          return {
+            repo: c('https://github.com/acme/secret'), deep: c('https://www.github.com/acme/secret/issues/3'),
+            raw: c('https://raw.githubusercontent.com/acme/secret/main/a.txt'), codeberg: c('https://codeberg.org/acme/secret'),
+            user: c('https://github.com/somebody-who-left'), topic: c('https://github.com/topics/nothing'),
+            docs: c('https://docs.github.com/en/a/b'), gist: c('https://gist.github.com/someone/abc123'),
+            gone: c('https://github.com/acme/secret', 410), elsewhere: c('https://example.com/a/b'),
+            old: Object.values(old).map((r) => r.cat),
+            preselected: m.PRESELECT_DEAD.has('private'),
+          };
+        """)
+        rules = rules if isinstance(rules, dict) else {}
+        check("rule: repository pages on GitHub and Codeberg, at any depth, may be private",
+              [rules.get(k) for k in ("repo", "deep", "raw", "codeberg")] == ["private"] * 4, rules)
+        check("rule: pages that can't be private stay 'not found' (a user, a topic, the docs, a gist, any other site)",
+              [rules.get(k) for k in ("user", "topic", "docs", "gist", "elsewhere")] == ["notfound"] * 5, rules)
+        check("rule: 410 Gone is always 'not found'", rules.get("gone") == "notfound", rules.get("gone"))
+        check("results saved by an older version are brought in line when the page opens",
+              rules.get("old") == ["private", "notfound", "notfound"] and rules.get("preselected") is False, rules.get("old"))
         chips = js("return Object.fromEntries([...document.querySelectorAll('#toolbar-dead .chip')].map(c => [c.dataset.filter, c.querySelector('b').textContent]))")
-        check("filter chips with counts", chips.get("all") == "8" and chips.get("notfound") == "2" and chips.get("timeout") == "1", chips)
+        check("filter chips with counts",
+              chips.get("all") == "9" and chips.get("notfound") == "2" and chips.get("private") == "1" and chips.get("timeout") == "1", chips)
         click('#toolbar-dead .chip[data-filter="timeout"]')
         check("filter shows one category", row_ids("list-dead") == [ids["Slow"]], row_ids("list-dead"))
         check("action counts only what's shown", "0 of 1 selected" in (text("#selInfo") or ""), text("#selInfo"))
@@ -301,7 +426,7 @@ def main():
               (res2.get(f"{S}/error") or {}).get("at", 0) > at0
               and (res2.get(f"{S}/missing") or {}).get("at") == (res.get(f"{S}/missing") or {}).get("at"),
               (res2.get(f"{S}/error"), at0))
-        check("re-check keeps the finished check's state", text("#count-dead") == "8", text("#count-dead"))
+        check("re-check keeps the finished check's state", text("#count-dead") == "9", text("#count-dead"))
         click("#selall-dead")  # untick it again
         click('#toolbar-dead .chip[data-filter="all"]')
         search = driver.find_element(By.CSS_SELECTOR, "#toolbar-dead .search")
@@ -311,7 +436,7 @@ def main():
         search.send_keys(" ")
         search.clear()
         js("const s = document.querySelector('#toolbar-dead .search'); s.value=''; s.dispatchEvent(new Event('input'));")
-        wait(lambda: len(row_ids("list-dead")) == 8)
+        wait(lambda: len(row_ids("list-dead")) == 9)
 
         # ---- remove: cancel changes nothing, confirm moves, undo restores
         before = children(ids["Links"])
@@ -330,13 +455,15 @@ def main():
         check("dead links moved into the Removed folder", moved == {ids["Missing"], ids["Gone"], ids["Closed"]}, moved)
         check("and out of their folder", not ({ids["Missing"], ids["Gone"], ids["Closed"]} & set(children(ids["Links"]))))
         check("not deleted", all(bm(ids[t]) for t in ("Missing", "Gone", "Closed")))
-        wait(lambda: text("#count-dead") == "5")
-        check("removed items leave the list", text("#count-dead") == "5", text("#count-dead"))
+        wait(lambda: text("#count-dead") == "6")
+        check("removed items leave the list", text("#count-dead") == "6", text("#count-dead"))
+        check("the possibly private bookmark was not removed with them",
+              ids["Private repo"] in children(ids["Links"]) and ids["Private repo"] not in moved, sorted(moved))
         click("#toastUndo")
         check("undo puts them back in order", wait(lambda: children(ids["Links"]) == before, 5), children(ids["Links"]))
         check("Removed folder empty after undo", children(removed_id) == [])
-        wait(lambda: text("#count-dead") == "8")
-        check("undone items back in the list", text("#count-dead") == "8", text("#count-dead"))
+        wait(lambda: text("#count-dead") == "9")
+        check("undone items back in the list", text("#count-dead") == "9", text("#count-dead"))
 
         # ---- redirects: update to new address, undo from Recent changes
         tab("redirects")
@@ -412,7 +539,7 @@ def main():
         wait(lambda: text("#nDupes") not in (None, ""))
         time.sleep(0.3)
         pop = {k: text("#" + k) for k in ("nDead", "nDupes", "nEmpty", "nRedirects")}
-        check("popup counts", pop == {"nDead": "8", "nDupes": "0", "nEmpty": "1", "nRedirects": "3"}, pop)
+        check("popup counts", pop == {"nDead": "9", "nDupes": "0", "nEmpty": "1", "nRedirects": "3"}, pop)
         check("popup has the Ko-fi pill", js("return document.querySelector('[data-support]').href") == "https://ko-fi.com/carcer7378")
         handles = set(driver.window_handles)
         click('.tile[data-tab="empty"]')
@@ -471,6 +598,7 @@ def main():
         check("list skips itself and unreleased add-ons, and desktop-only ones on Android",
               more.get("desktopPick") == ["a", "b"] and more.get("androidPick") == ["b"],
               (more.get("desktopPick"), more.get("androidPick")))
+        check_milestone_card(ext_call)
     finally:
         driver.quit()
         httpd.shutdown()

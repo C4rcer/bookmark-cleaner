@@ -6,7 +6,7 @@ import {
   restoreOne, snapshot, undo, updateUrls,
 } from "../shared/bookmarks.js";
 import {
-  DEAD_CATS, PRESELECT_DEAD, REDIRECT_KINDS, Scanner, isCheckable, isSkipped, parseUrl,
+  DEAD_CATS, PRESELECT_DEAD, REDIRECT_KINDS, Scanner, isCheckable, isSkipped, parseUrl, refreshCats,
 } from "./checker.js";
 
 const $ = (id) => document.getElementById(id);
@@ -88,6 +88,9 @@ function urlLink(url, cls = "url") {
     ? h("a", { class: cls, href: url, target: "_blank", rel: "noopener noreferrer", title: url }, url)
     : h("span", { class: cls, title: url }, url);
 }
+
+const PRIVATE_HINT = "This site says \"not found\" for private pages when you are signed out, and Prune never "
+  + "signs in. Open the link to see whether it still works.";
 
 function badge(info, extra) {
   return h("span", { class: "badge " + (info.level || "info") }, info.short + (extra ? ` · ${extra}` : ""));
@@ -409,7 +412,8 @@ function rowEl(t, it) {
     const r = it.r;
     const code = r.code >= 400 ? String(r.code) : "";
     main = [h("div", { class: "title" }, b.title || "(no title)"), urlLink(b.url),
-      r.cat === "home" && r.finalUrl ? urlLink(r.finalUrl, "url-new") : null];
+      r.cat === "home" && r.finalUrl ? urlLink(r.finalUrl, "url-new") : null,
+      r.cat === "private" ? h("div", { class: "meta" }, PRIVATE_HINT) : null];
     side = badge(DEAD_CATS[r.cat], code);
   } else if (t === "redirects") {
     main = [h("div", { class: "title" }, b.title || "(no title)"), urlLink(b.url), urlLink(it.r.finalUrl, "url-new")];
@@ -698,7 +702,7 @@ async function showMilestone() {
   const { stats } = await browser.storage.local.get("stats");
   const cleaned = (stats && stats.cleaned) || 0;
   await maybeShowMilestone($("supportCard"), cleaned, MILESTONES, (m) =>
-    `Prune has tidied up ${fmt(m)} bookmarks for you so far. It's free, with no ads and no tracking. If that was worth a coffee, tips keep it maintained.`);
+    `Prune has tidied up ${fmt(m)} bookmarks for you so far.`);
 }
 
 // ---------------------------------------------------------------- actions
@@ -963,7 +967,7 @@ async function init() {
   });
 
   const got = await browser.storage.local.get(["linkResults", "scanState", "openTab"]);
-  st.results = got.linkResults || {};
+  st.results = refreshCats(got.linkResults || {});
   st.scan = got.scanState || null;
   st.settings = await getSettings();
   const hashTab = location.hash.replace(/^#/, "");

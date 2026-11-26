@@ -9,6 +9,7 @@
 
 export const DEAD_CATS = {
   notfound: { label: "Not found (404 / 410)", short: "Not found", level: "bad" },
+  private: { label: "May be private: this site answers \"not found\" to anyone who is signed out", short: "May be private", level: "info" },
   unreachable: { label: "Site unreachable", short: "Unreachable", level: "bad" },
   home: { label: "Sends you to a home page", short: "Home page", level: "warn" },
   timeout: { label: "Timed out", short: "Timed out", level: "warn" },
@@ -62,6 +63,41 @@ export function isSkipped(raw, skipHosts) {
   return skipHosts.some((s) => host === s || host.endsWith("." + s));
 }
 
+// Sites that answer "404 Not Found" for a page that exists but is private, to
+// anyone who is not signed in, so that they don't give away that it exists.
+// Prune checks without cookies, so there a 404 can't tell a deleted page from
+// a private one, and such a bookmark must not be ticked for removal.
+// Checked signed out on 2026-11-26: a private GitHub repository answers 404
+// (GitLab sends a signed-out visitor to its sign-in page instead, which is
+// already reported as "Goes to a sign-in page"). Forgejo, which Codeberg runs,
+// does the same as GitHub. Each rule gets the path's segments and says whether
+// that address can be private at all: a user or topic page on GitHub can't.
+const GITHUB_PUBLIC = new Set(["topics", "marketplace", "features", "collections", "apps", "about", "site", "explore"]);
+const PRIVATE_404 = {
+  "github.com": (seg) => seg.length >= 2 && !GITHUB_PUBLIC.has(seg[0]),
+  "raw.githubusercontent.com": (seg) => seg.length >= 2,
+  "codeberg.org": (seg) => seg.length >= 2,
+};
+
+/** True when a 404 for this address may only mean "you are not signed in". */
+export function hidesPrivatePages(raw) {
+  const u = parseUrl(raw);
+  if (!u) return false;
+  const rule = PRIVATE_404[u.hostname.toLowerCase().replace(/^www\./, "")];
+  return !!rule && rule(u.pathname.split("/").filter(Boolean).map((s) => s.toLowerCase()));
+}
+
+/**
+ * Results saved by 0.1.2 or earlier call every 404 "notfound". Bring the ones
+ * that may be private in line, so an old check isn't shown ticked for removal.
+ */
+export function refreshCats(results) {
+  for (const [url, r] of Object.entries(results || {})) {
+    if (r && r.cat === "notfound" && r.code === 404 && hidesPrivatePages(url)) r.cat = "private";
+  }
+  return results;
+}
+
 function withoutHash(raw) {
   const u = parseUrl(raw);
   if (!u) return raw;
@@ -92,6 +128,8 @@ export function classify(orig, r) {
   if (r.error === "timeout") return { cat: local ? "local" : "timeout" };
   if (r.error) return { cat: local ? "local" : "unreachable", error: r.message || "" };
   const code = r.status;
+  // 410 says "gone" outright; only a 404 can stand for "private".
+  if (code === 404 && hidesPrivatePages(r.url || orig)) return { cat: "private", code };
   if (code === 404 || code === 410) return { cat: "notfound", code };
   if (code === 401 || code === 403 || code === 407 || code === 429 || code === 451 || code === 999) {
     return { cat: "blocked", code };
